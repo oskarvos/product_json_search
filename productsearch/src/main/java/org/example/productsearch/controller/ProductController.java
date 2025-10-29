@@ -123,4 +123,19 @@ public class ProductController {
         return ResponseEntity.ok(products);
     }
 
+    @GetMapping("/search/in-store")
+    public ResponseEntity<List<Product>> searchInStore(
+            @RequestParam String storeName,
+            @RequestParam(required = false) String productName) {
+
+        List<Product> products;
+        if (productName != null) {
+            products = productRepository.findByStoreNameAndProductNameContainingIgnoreCase(storeName, productName);
+        } else {
+            products = productRepository.findByStoreName(storeName);
+        }
+
+        return ResponseEntity.ok(products);
+    }
+
 }

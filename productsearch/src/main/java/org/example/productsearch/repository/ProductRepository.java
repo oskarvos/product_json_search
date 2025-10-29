@@ -21,6 +21,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // Поиск по категории
     List<Product> findByCategoryContainingIgnoreCase(String category);
 
+    List<Product> findByStoreNameAndProductNameContainingIgnoreCase(String storeName, String productName);
+
     // Упрощенный комплексный поиск
     @Query("SELECT p FROM Product p WHERE " +
             "(:productName IS NULL OR p.productName LIKE %:productName%) AND " +
