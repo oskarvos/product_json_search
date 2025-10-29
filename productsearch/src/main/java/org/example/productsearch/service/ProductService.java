@@ -20,9 +20,16 @@ public class ProductService {
     @Autowired
     private JsonParserService jsonParserService;
 
+    public List<Product> saveProductsFromJson(String jsonData, String storeName) {
+        List<Product> products = jsonParserService.parseJsonToProducts(jsonData, storeName);
+        return productRepository.saveAll(products);
+    }
+
+    // Для обратной совместимости оставляем старый метод
     public Product saveProductFromJson(String jsonData, String storeName) {
-        Product product = jsonParserService.parseJsonToProduct(jsonData, storeName);
-        return productRepository.save(product);
+        List<Product> products = saveProductsFromJson(jsonData, storeName);
+        // Возвращаем первый продукт (основной) для обратной совместимости
+        return products.isEmpty() ? null : products.get(0);
     }
 
     public List<Product> searchProducts(String productName, String category,
@@ -47,7 +54,7 @@ public class ProductService {
     public void processAndSaveJsonFile(String filePath, String storeName) {
         try {
             String jsonContent = new String(Files.readAllBytes(Paths.get(filePath)));
-            saveProductFromJson(jsonContent, storeName);
+            saveProductsFromJson(jsonContent, storeName);
         } catch (IOException e) {
             throw new RuntimeException("Error reading file: " + filePath, e);
         }
