@@ -18,16 +18,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // Поиск по магазину
     List<Product> findByStoreName(String storeName);
 
-    // Комплексный поиск
+    // Поиск по категории
+    List<Product> findByCategoryContainingIgnoreCase(String category);
+
+    // Упрощенный комплексный поиск
     @Query("SELECT p FROM Product p WHERE " +
-            "(:productName IS NULL OR LOWER(p.productName) LIKE LOWER(CONCAT('%', :productName, '%'))) AND " +
-            "(:category IS NULL OR LOWER(p.category) LIKE LOWER(CONCAT('%', :category, '%'))) AND " +
+            "(:productName IS NULL OR p.productName LIKE %:productName%) AND " +
+            "(:category IS NULL OR p.category LIKE %:category%) AND " +
             "(:minPrice IS NULL OR p.price >= :minPrice) AND " +
             "(:maxPrice IS NULL OR p.price <= :maxPrice) AND " +
             "(:minWeight IS NULL OR p.weightGrams >= :minWeight) AND " +
             "(:maxWeight IS NULL OR p.weightGrams <= :maxWeight) AND " +
             "(:fatPercent IS NULL OR p.fatPercent = :fatPercent) AND " +
-            "(:productType IS NULL OR LOWER(p.productType) LIKE LOWER(CONCAT('%', :productType, '%'))) AND " +
+            "(:productType IS NULL OR p.productType LIKE %:productType%) AND " +
             "(:available IS NULL OR p.available = :available)")
     List<Product> searchProducts(
             @Param("productName") String productName,
