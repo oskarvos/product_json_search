@@ -5,7 +5,10 @@ import org.example.productsearch.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 
 @Service
@@ -39,5 +42,14 @@ public class ProductService {
 
     public List<Product> getProductsByStore(String storeName) {
         return productRepository.findByStoreName(storeName);
+    }
+
+    public void processAndSaveJsonFile(String filePath, String storeName) {
+        try {
+            String jsonContent = new String(Files.readAllBytes(Paths.get(filePath)));
+            saveProductFromJson(jsonContent, storeName);
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading file: " + filePath, e);
+        }
     }
 }
