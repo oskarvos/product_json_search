@@ -17,8 +17,7 @@ public class FileProcessingService {
     @Autowired
     private ProductService productService;
 
-    // Исправьте путь на правильный
-    private final Path jsonDirectory = Paths.get("json_file"); // или "json_files" в зависимости от вашей структуры
+    private final Path jsonDirectory = Paths.get("json_files");
 
     public void processAllJsonFiles() {
         try {
@@ -30,6 +29,7 @@ public class FileProcessingService {
 
             System.out.println("Processing files from: " + jsonDirectory.toAbsolutePath());
 
+            // Считаем файлы для отладки
             try (Stream<Path> paths = Files.walk(jsonDirectory)) {
                 long fileCount = paths
                         .filter(Files::isRegularFile)
@@ -59,6 +59,9 @@ public class FileProcessingService {
             String jsonContent = new String(Files.readAllBytes(filePath));
             String storeName = extractStoreName(filePath);
 
+            // Логируем первые 200 символов для отладки структуры
+            System.out.println("File content preview: " + jsonContent.substring(0, Math.min(200, jsonContent.length())));
+
             List<Product> products = productService.saveProductsFromJson(jsonContent, storeName);
 
             System.out.println("Successfully processed: " + filePath +
@@ -66,7 +69,10 @@ public class FileProcessingService {
                     " | Products saved: " + products.size());
 
             for (Product product : products) {
-                System.out.println("  - " + product.getProductName() + " | Price: " + product.getPrice());
+                System.out.println("  - " + product.getProductName() +
+                        " | Category: " + product.getCategory() +
+                        " | Price: " + product.getPrice() +
+                        " | Weight: " + product.getWeightGrams());
             }
 
         } catch (Exception e) {

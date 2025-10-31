@@ -15,31 +15,154 @@ public class JsonParserService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public List<Product> parseJsonToProducts(String jsonData, String storeName) {
-        List<Product> products = new ArrayList<>();
         try {
             JsonNode rootNode = objectMapper.readTree(jsonData);
 
-            // Парсим основной продукт из menu_item
-            if (rootNode.has("menu_item")) {
-                Product mainProduct = parseMenuItem(rootNode.get("menu_item"), storeName);
-                if (mainProduct != null) {
-                    products.add(mainProduct);
-                }
+            // Определяем тип структуры JSON
+            if (isNewJsonStructure(rootNode)) {
+                return parseNewJsonStructure(rootNode, storeName);
+            } else {
+                return parseOldJsonStructure(rootNode, storeName);
             }
-
-            // Парсим рекомендуемые продукты из detailed_data
-            if (rootNode.has("detailed_data")) {
-                List<Product> recommendedProducts = parseRecommendedProducts(rootNode.get("detailed_data"), storeName);
-                products.addAll(recommendedProducts);
-            }
-
-            return products;
 
         } catch (Exception e) {
             throw new RuntimeException("Error parsing JSON", e);
         }
     }
 
+    private boolean isNewJsonStructure(JsonNode rootNode) {
+        // Проверяем, есть ли поле "products" в корне - это признак новой структуры
+        return rootNode.has("products") && rootNode.get("products").isArray();
+    }
+
+    private List<Product> parseOldJsonStructure(JsonNode rootNode, String storeName) {
+        List<Product> products = new ArrayList<>();
+
+        // Парсим основной продукт из menu_item
+        if (rootNode.has("menu_item")) {
+            Product mainProduct = parseMenuItem(rootNode.get("menu_item"), storeName);
+            if (mainProduct != null) {
+                products.add(mainProduct);
+            }
+        }
+
+        // Парсим рекомендуемые продукты из detailed_data
+        if (rootNode.has("detailed_data")) {
+            List<Product> recommendedProducts = parseRecommendedProducts(rootNode.get("detailed_data"), storeName);
+            products.addAll(recommendedProducts);
+        }
+
+        return products;
+    }
+
+    private List<Product> parseNewJsonStructure(JsonNode rootNode, String storeName) {
+        List<Product> products = new ArrayList<>();
+        JsonNode productsNode = rootNode.get("products");
+
+        if (productsNode != null && productsNode.isArray()) {
+            for (JsonNode productNode : productsNode) {
+                Product product = parseNewProductStructure(productNode, storeName);
+                if (product != null) {
+                    products.add(product);
+                }
+            }
+        }
+
+        return products;
+    }
+
+    private Product parseNewProductStructure(JsonNode productNode, String storeName) {
+        Product product = new Product();
+        product.setStoreName(storeName);
+
+        // Извлекаем основные поля из новой структуры
+        if (productNode.has("name")) {
+            product.setProductName(productNode.get("name").asText());
+        }
+
+        if (productNode.has("category")) {
+            product.setCategory(productNode.get("category").asText());
+        }
+
+        // Обрабатываем цену - используем discounted_price если есть, иначе price
+        if (productNode.has("discounted_price") && !productNode.get("discounted_price").isNull()) {
+            String priceStr = productNode.get("discounted_price").asText();
+            try {
+                product.setPrice(new BigDecimal(priceStr));
+            } catch (NumberFormatException e) {
+                // Если не удалось распарсить, пробуем обычную цену
+                if (productNode.has("price")) {
+                    product.setPrice(BigDecimal.valueOf(productNode.get("price").asDouble()));
+                }
+            }
+        } else if (productNode.has("price")) {
+            product.setPrice(BigDecimal.valueOf(productNode.get("price").asDouble()));
+        }
+
+        // Извлекаем вес
+        if (productNode.has("weight")) {
+            String weightStr = productNode.get("weight").asText();
+            product.setWeightGrams(extractWeightInGrams(weightStr));
+        }
+
+        // Определяем тип продукта и жирность на основе названия и категории
+        String name = productNode.has("name") ? productNode.get("name").asText() : "";
+        String category = productNode.has("category") ? productNode.get("category").asText() : "";
+        determineCategoryAndTypeForNewStructure(product, name, category);
+
+        // Извлекаем доступность
+        if (productNode.has("is_available")) {
+            product.setAvailable(productNode.get("is_available").asBoolean());
+        } else {
+            product.setAvailable(true);
+        }
+
+        // Сохраняем полный JSON продукта
+        product.setRawData(productNode.toString());
+
+        return product;
+    }
+
+    private void determineCategoryAndTypeForNewStructure(Product product, String name, String category) {
+        String nameLower = name.toLowerCase();
+        String categoryLower = category.toLowerCase();
+
+        // Если категория уже задана, используем ее, иначе определяем по названию
+        if (category == null || category.trim().isEmpty()) {
+            determineCategoryAndType(product, name);
+        } else {
+            product.setCategory(category);
+
+            // Уточняем тип продукта на основе названия и категории
+            if (categoryLower.contains("молоко") || categoryLower.contains("яйца")) {
+                product.setProductType("Молочные продукты");
+                product.setFatPercent(extractFatPercent(nameLower));
+            } else if (categoryLower.contains("сыр") && nameLower.contains("тверд")) {
+                product.setProductType("Твердый сыр");
+            } else if (categoryLower.contains("хлеб")) {
+                product.setProductType("Хлеб");
+            } else if (categoryLower.contains("масло")) {
+                product.setProductType("Масло");
+                product.setFatPercent(extractFatPercent(nameLower));
+            } else if (categoryLower.contains("мясо") || categoryLower.contains("птица") || categoryLower.contains("колбас")) {
+                product.setProductType("Мясные продукты");
+            } else if (categoryLower.contains("кофе")) {
+                product.setProductType("Кофе");
+            } else if (categoryLower.contains("мука")) {
+                product.setProductType("Мука");
+            } else if (categoryLower.contains("консерв")) {
+                product.setProductType("Консервы");
+            } else if (categoryLower.contains("каша") || categoryLower.contains("смеси")) {
+                product.setProductType("Каши и смеси");
+            } else if (categoryLower.contains("макарон")) {
+                product.setProductType("Макаронные изделия");
+            } else {
+                product.setProductType("Другое");
+            }
+        }
+    }
+
+    // Существующие методы остаются без изменений
     private Product parseMenuItem(JsonNode menuItem, String storeName) {
         Product product = new Product();
         product.setStoreName(storeName);
@@ -182,6 +305,10 @@ public class JsonParserService {
 
                 // Если в строке есть указание на кг, умножаем на 1000
                 if (weightStr.toLowerCase().contains("кг") || weightStr.toLowerCase().contains("kg")) {
+                    return (int) (weight * 1000);
+                }
+                // Если указание на литры, тоже считаем как граммы (для совместимости)
+                if (weightStr.toLowerCase().contains("л")) {
                     return (int) (weight * 1000);
                 }
                 return (int) weight;
